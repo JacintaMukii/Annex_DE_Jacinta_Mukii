@@ -15,6 +15,7 @@ The solution follows a medallion architecture approach:
 # Architecture
 
 The pipeline follows the structure below:
+
 <img width="1074" height="493" alt="Annex_DE_Jacinta-Mukii-DataWarehouseArchitecture" src="https://github.com/user-attachments/assets/3b0ff003-034e-4a32-b1eb-0115f9ed1aaa" />
 
 
