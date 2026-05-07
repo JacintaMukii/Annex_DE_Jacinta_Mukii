@@ -48,7 +48,7 @@ Creates analytics-ready tables with engineered business features such as:
 | ---------------------------- | ---------------------------------- |
 | Microsoft SQL Server         | Data warehouse and transformations |
 | SQL Server Management Studio | Query execution and management     |
-| Python (optional)            | Data profiling and exploration     |
+| Python                       | Data profiling and exploration     |
 | Power BI / Excel             | Reporting and visualization        |
 
 ---
