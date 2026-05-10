@@ -25,104 +25,93 @@ GO
 Loading the Datasets
 -------------------------------------------------------------------------------
 */
+
+USE DataWarehouse;
+GO
+
 CREATE OR ALTER PROCEDURE bronze.load_bronze AS
 BEGIN
-	DECLARE @start_time DATETIME, @end_time DATETIME, @batch_start_time DATETIME, @batch_end_time DATETIME; 
-	BEGIN TRY
-		SET @batch_start_time = GETDATE();
-		PRINT '================================================';
-		PRINT 'Loading Bronze Layer';
-		PRINT '================================================';
+    DECLARE @start_time DATETIME, @end_time DATETIME, @batch_start_time DATETIME, @batch_end_time DATETIME; 
+    
+    BEGIN TRY
+        SET @batch_start_time = GETDATE();
+        PRINT '================================================';
+        PRINT 'Loading Bronze Layer';
+        PRINT '================================================';
 
-		PRINT '------------------------------------------------';
-		PRINT 'Loading Credit data, NPS Data, and Sales & Customer Tables';
-		PRINT '------------------------------------------------';
+        -- 1. Loading Credit Data
+        SET @start_time = GETDATE();
+        PRINT '>> Truncating & Loading: bronze.credit_data';
+        TRUNCATE TABLE bronze.credit_data;
+        BULK INSERT bronze.credit_data
+        FROM 'C:\Users\Wanjiru\Documents\Annex_DE_Jacinta_Mukii\Data\abc_credit_data.csv'
+        WITH (
+            FIRSTROW = 2,
+            FIELDTERMINATOR = ',',
+            ROWTERMINATOR = '0x0a', 
+            TABLOCK
+        );
+        SET @end_time = GETDATE();
+        PRINT '>> Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 's';
 
-/*
--------------------------------------------------------------------------------
-Loading the Credit Data
--------------------------------------------------------------------------------
-*/
-		SET @start_time = GETDATE();
-		PRINT '>> Truncating Table: bronze.credit_data';
-		TRUNCATE TABLE bronze.credit_data;
-		PRINT '>> Inserting Data Into: bronze.credit_data';
-				BULK INSERT bronze.credit_data
-		FROM 'C:\Users\Wanjiru\Documents\Annex_DE_Jacinta_Mukii\Data\abc_credit_data.csv'
-		WITH (
-			FIRSTROW = 2,
-			FIELDTERMINATOR = ',',
-			ROWTERMINATOR = '0x0a', -- Use hex for 'Line Feed' to avoid parsing issues
-			TABLOCK
-		); -- <--- Ensure this semicolon is here
-		SET @end_time = GETDATE();
-		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' seconds';
-		PRINT '>> -------------';
+        -- 2. Loading NPS Data
+        SET @start_time = GETDATE();
+        PRINT '>> Truncating & Loading: bronze.NPS_data';
+        TRUNCATE TABLE bronze.NPS_data;
+        BULK INSERT bronze.NPS_data
+        FROM 'C:\Users\Wanjiru\Documents\Annex_DE_Jacinta_Mukii\Data\abc_NPS_data.csv'
+        WITH (
+            FORMAT = 'CSV',
+            FIRSTROW = 2,
+            FIELDTERMINATOR = ',',
+            ROWTERMINATOR = '\n',
+            MAXERRORS = 100,
+            TABLOCK
+        );
+        SET @end_time = GETDATE();
+        PRINT '>> Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 's';
 
+        -- 3. Loading Sales and Customer Data
+        SET @start_time = GETDATE();
+        PRINT '>> Truncating & Loading: bronze.sales_and_customer_data';
+        TRUNCATE TABLE bronze.sales_and_customer_data;
+        BULK INSERT bronze.sales_and_customer_data
+        FROM 'C:\Users\Wanjiru\Documents\Annex_DE_Jacinta_Mukii\Data\abc_Sales_and_Customer_data.csv'
+        WITH (
+            FORMAT = 'CSV',
+            FIRSTROW = 2,
+            FIELDTERMINATOR = ',',
+            ROWTERMINATOR = '\n',
+            MAXERRORS = 100,
+            TABLOCK
+        );
+        SET @end_time = GETDATE();
+        PRINT '>> Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + 's';
 
-/*
--------------------------------------------------------------------------------
-Loading the NPS Data
--------------------------------------------------------------------------------
-*/
+        PRINT '================================================';
+        PRINT 'Batch Load Completed Successfully';
+        PRINT 'Total Time: ' + CAST(DATEDIFF(second, @batch_start_time, GETDATE()) AS NVARCHAR) + 's';
+        PRINT '================================================';
 
-		SET @start_time = GETDATE();
-		PRINT '>> Truncating Table: bronze.NPS_data';
-		TRUNCATE TABLE bronze.NPS_data;
-		PRINT '>> Inserting Data Into: bronze.NPS_data';
-		BULK INSERT bronze.NPS_data
-		FROM 'C:\Users\Wanjiru\Documents\Annex_DE_Jacinta_Mukii\Data\abc_NPS_data.csv'
-		WITH (
-			FORMAT = 'CSV',
-			FIRSTROW = 2,
-			FIELDTERMINATOR = ',',
-			ROWTERMINATOR = '\n',
-			MAXERRORS = 100, -- Allows you to see more rows even if some fail
-			TABLOCK
-		);
-		SET @end_time = GETDATE();
-		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' seconds';
-		PRINT '>> -------------';
-
-/*
--------------------------------------------------------------------------------
-Loading the Sales and Customer Data
--------------------------------------------------------------------------------
-*/
-
-		SET @start_time = GETDATE();
-		PRINT '>> Truncating Table: bronze.sales_and_customer_data';
-		TRUNCATE TABLE bronze.sales_and_customer_data;
-		PRINT '>> Inserting Data Into: bronze.sales_and_customer_data';
-		BULK INSERT bronze.sales_and_customer_data
-		FROM 'C:\Users\Wanjiru\Documents\Annex_DE_Jacinta_Mukii\Data\abc_Sales_and_Customer_data.csv'
-		WITH (
-			FORMAT = 'CSV',
-			FIRSTROW = 2,
-			FIELDTERMINATOR = ',',
-			ROWTERMINATOR = '\n',
-			MAXERRORS = 100, -- Allows you to see more rows even if some fail
-			TABLOCK
-		);
-		SET @end_time = GETDATE();
-		PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' seconds';
-		PRINT '>> -------------';
-
-	END TRY
-	BEGIN CATCH
-		PRINT 'Error occurred during loading';
-		PRINT ERROR_MESSAGE();
-	END CATCH
+    END TRY
+    BEGIN CATCH
+        PRINT 'ERROR DETECTED!';
+        PRINT 'Error Message: ' + ERROR_MESSAGE();
+        PRINT 'Error Line: ' + CAST(ERROR_LINE() AS NVARCHAR);
+    END CATCH
 END;
 GO
 
-SELECT * FROM bronze.credit_data
+-- TO EXECUTE THE LOAD:
+EXEC bronze.load_bronze;
 GO
 
-SELECT * FROM bronze.NPS_data
-GO
-
-SELECT * FROM bronze.Sales_and_Customer_data
+-- CHECK THE RESULTS:
+SELECT 'Credit' AS TableName, COUNT(*) AS TotalRows FROM bronze.credit_data
+UNION ALL
+SELECT 'NPS' AS TableName, COUNT(*) AS TotalRows FROM bronze.NPS_data
+UNION ALL
+SELECT 'Sales' AS TableName, COUNT(*) AS TotalRows FROM bronze.sales_and_customer_data;
 GO
 
 
