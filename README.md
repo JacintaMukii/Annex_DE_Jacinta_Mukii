@@ -30,6 +30,9 @@ Source Files → Bronze → Silver → Gold → Reporting
 
 Stores raw ingested datasets with minimal transformations.
 
+<img width="183" height="111" alt="image" src="https://github.com/user-attachments/assets/b2db8fb3-1ebe-49e2-98a5-2177f9cfe3dd" />
+
+
 ### Silver Layer
 
 Applies cleaning, standardization, deduplication, and validation rules.
