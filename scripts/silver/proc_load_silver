@@ -1,0 +1,134 @@
+/*
+===============================================================================
+Stored Procedure: Load Silver Layer (Bronze -> Silver)
+===============================================================================
+Script Purpose:
+    This stored procedure performs the ETL (Extract, Transform, Load) process to 
+    populate the 'silver' schema tables from the 'bronze' schema.
+	Actions Performed:
+		- Truncates Silver tables.
+		- Inserts transformed and cleansed data from Bronze into Silver tables.
+		
+Parameters:
+    None. 
+
+Usage Example:
+    EXEC silver.load_silver;
+===============================================================================
+*/
+
+CREATE OR ALTER PROCEDURE silver.load_silver AS
+BEGIN
+    DECLARE @start_time DATETIME, @end_time DATETIME, @batch_start_time DATETIME, @batch_end_time DATETIME; 
+    BEGIN TRY
+        SET @batch_start_time = GETDATE();
+        PRINT '================================================';
+        PRINT 'Loading Silver Layer';
+        PRINT '================================================';
+
+		PRINT '------------------------------------------------';
+		PRINT 'Loading Finance and Sales Tables';
+		PRINT '------------------------------------------------';
+
+		-- Loading silver.credit_data
+        SET @start_time = GETDATE();
+		PRINT '>> Truncating Table: silver.credit_data';
+		TRUNCATE TABLE silver.credit_data;
+		PRINT '>> Inserting Data Into: silver.credit_data';
+		INSERT INTO silver.credit_data (
+			LOAN_ID, [DATE], CUSTOMER_AGE, TOTAL_PAID, TOTAL_DUE_TODAY, BALANCE, 
+            DAYS_PAST_DUE, CLOSING_BALANCE, ADVANCE, BALANCE_DUE_TO_DATE, ARREARS, 
+            BALANCE_DUE_STATUS, PAYMENT, EXPECTED_PAYMENT, FIRST_PAYMENT, 
+            FIRST_EXPECTED_PAYMENT, ACCOUNT_STATUS_L1, ACCOUNT_STATUS_L2, 
+            RETURN_DATE, SALE_DATE, CREDIT_CHECK_DONE, PAYMENT_AMOUNT, 
+            ADJUSTMENT_AMOUNT, PREPAYMENT_AMOUNT, DEPOSIT, WEEKLY_RATE, 
+            CREDIT_EXPIRY, NEXT_INVOICE_DATE, DISCOUNT, OVERPAYMENT_AMOUNT, 
+            MAX_PAYMENT_DATE, INITIAL_PAY, TOTAL_PAID_WITH_ADJUSTMENTS_15D
+		)
+		SELECT 
+            LOAN_ID, [DATE], CUSTOMER_AGE, TOTAL_PAID, TOTAL_DUE_TODAY, BALANCE, 
+            DAYS_PAST_DUE, CLOSING_BALANCE, ADVANCE, BALANCE_DUE_TO_DATE, ARREARS, 
+            TRIM(BALANCE_DUE_STATUS), PAYMENT, EXPECTED_PAYMENT, FIRST_PAYMENT, 
+            FIRST_EXPECTED_PAYMENT, TRIM(ACCOUNT_STATUS_L1), TRIM(ACCOUNT_STATUS_L2), 
+            RETURN_DATE, SALE_DATE, TRIM(CREDIT_CHECK_DONE), PAYMENT_AMOUNT, 
+            ADJUSTMENT_AMOUNT, PREPAYMENT_AMOUNT, DEPOSIT, WEEKLY_RATE, 
+            CREDIT_EXPIRY, NEXT_INVOICE_DATE, DISCOUNT, OVERPAYMENT_AMOUNT, 
+            MAX_PAYMENT_DATE, INITIAL_PAY, TOTAL_PAID_WITH_ADJUSTMENTS_15D
+        FROM (
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY LOAN_ID ORDER BY [DATE] DESC) as rn
+            FROM bronze.credit_data
+            WHERE LOAN_ID IS NOT NULL
+        ) t WHERE rn = 1; -- Deduplication: Keeps the most recent loan record
+		SET @end_time = GETDATE();
+        PRINT '>> Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+        PRINT '>> -------------';
+
+		-- Loading silver.sales_and_customer_data
+        SET @start_time = GETDATE();
+		PRINT '>> Truncating Table: silver.sales_and_customer_data';
+		TRUNCATE TABLE silver.sales_and_customer_data;
+		PRINT '>> Inserting Data Into: silver.sales_and_customer_data';
+		INSERT INTO silver.sales_and_customer_data (
+			SALE_ID, SALE_DATE, RETURNED, RETURN_DATE, SALE_TYPE, SELLER, 
+            SELLER_TYPE, RETURN_POLICY_COMPLIANCE, CASH_PRICE, LOAN_PRICE, 
+            CLIENT_MODEL, BUSINESS_MODEL, LOAN_TERM, PRODUCT_NAME, MODEL, LOAN_ID
+		)
+		SELECT 
+            TRIM(SALE_ID), SALE_DATE, 
+			CASE WHEN TRIM(RETURNED) IN ('1', 'Yes', 'Y') THEN 'Yes' ELSE 'No' END, -- Normalize boolean
+			RETURN_DATE, TRIM(SALE_TYPE), TRIM(SELLER), TRIM(SELLER_TYPE), 
+            TRIM(RETURN_POLICY_COMPLIANCE), CASH_PRICE, LOAN_PRICE, 
+            TRIM(CLIENT_MODEL), TRIM(BUSINESS_MODEL), LOAN_TERM, 
+            TRIM(PRODUCT_NAME), TRIM(MODEL), TRIM(LOAN_ID)
+        FROM bronze.sales_and_customer_data;
+        SET @end_time = GETDATE();
+        PRINT '>> Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+        PRINT '>> -------------';
+
+		PRINT '------------------------------------------------';
+		PRINT 'Loading Survey Tables';
+		PRINT '------------------------------------------------';
+
+        -- Loading silver.NPS_data
+        SET @start_time = GETDATE();
+		PRINT '>> Truncating Table: silver.NPS_data';
+		TRUNCATE TABLE silver.NPS_data;
+		PRINT '>> Inserting Data Into: silver.NPS_data';
+		INSERT INTO silver.NPS_data (
+			Submission_ID, Respondent_ID, Submitted_at, Loan_ID, Recommendation_Score, 
+            Main_Reason, Improvement_Suggestion, Device_Quality_Satisfaction, 
+            Service_Support_Satisfaction, Payment_Reflection_Delay, 
+            Support_Assistance_Difficulty, Support_Challenge_Description, 
+            Battery_Issues, MoApp_Usage, Preferred_Communication_Channel, 
+            Phone_Lock_Despite_Payment, Any_other_Feedback
+		)
+		SELECT 
+            TRIM(Submission_ID), TRIM(Respondent_ID), Submitted_at, TRIM(Loan_ID), 
+            Recommendation_Score, TRIM(Main_Reason), TRIM(Improvement_Suggestion), 
+            TRIM(Device_Quality_Satisfaction), TRIM(Service_Support_Satisfaction), 
+            TRIM(Payment_Reflection_Delay), TRIM(Support_Assistance_Difficulty), 
+            TRIM(Support_Challenge_Description), TRIM(Battery_Issues), 
+            TRIM(MoApp_Usage), TRIM(Preferred_Communication_Channel), 
+            TRIM(Phone_Lock_Despite_Payment), TRIM(Any_other_Feedback)
+        FROM bronze.NPS_data;
+        SET @end_time = GETDATE();
+        PRINT '>> Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+        PRINT '>> -------------';
+
+		SET @batch_end_time = GETDATE();
+		PRINT '=========================================='
+		PRINT 'Loading Silver Layer is Completed';
+        PRINT '   - Total Load Duration: ' + CAST(DATEDIFF(SECOND, @batch_start_time, @batch_end_time) AS NVARCHAR) + ' seconds';
+		PRINT '=========================================='
+
+	END TRY
+	BEGIN CATCH
+		PRINT '=========================================='
+		PRINT 'ERROR OCCURRED DURING LOADING SILVER LAYER'
+		PRINT 'Error Message' + ERROR_MESSAGE();
+		PRINT 'Error Message' + CAST (ERROR_NUMBER() AS NVARCHAR);
+		PRINT 'Error Message' + CAST (ERROR_STATE() AS NVARCHAR);
+		PRINT '=========================================='
+	END CATCH
+END;
+GO
