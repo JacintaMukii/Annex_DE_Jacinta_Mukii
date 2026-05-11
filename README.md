@@ -37,6 +37,9 @@ Stores raw ingested datasets with minimal transformations.
 
 Applies cleaning, standardization, deduplication, and validation rules.
 
+<img width="201" height="54" alt="image" src="https://github.com/user-attachments/assets/fedaa995-3a58-407c-bd47-fbc522a0ad2d" />
+
+
 ### Gold Layer
 
 Creates analytics-ready tables with engineered business features such as:
